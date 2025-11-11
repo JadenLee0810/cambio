@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { useGameStore } from '@/stores/gameStore'
 import { createClient } from '@/lib/supabase/client'
+import { PlayerHand } from '@/components/game/PlayerHand/PlayerHand'
 
 export default function GamePage() {
   const params = useParams()
@@ -25,7 +26,6 @@ export default function GamePage() {
       const supabase = createClient()
       const playerId = localStorage.getItem('playerId')
       
-      // Fetch initial game state
       const { data: roomData } = await supabase
         .from('game_rooms')
         .select('*')
@@ -37,11 +37,14 @@ export default function GamePage() {
         .select('*')
         .eq('room_id', roomId)
       
+      // Verify player ID is valid for this room
+      const validPlayer = playersData?.find(p => p.id === playerId)
+      
       if (roomData && playersData) {
         setGameState({
           room: roomData,
           players: playersData,
-          my_player_id: playerId || undefined
+          my_player_id: validPlayer ? playerId || undefined : undefined
         })
       }
       
@@ -53,6 +56,30 @@ export default function GamePage() {
     
     return () => unsubscribe()
   }, [roomId])
+
+  const toggleReady = async () => {
+    if (!my_player_id) return
+    
+    const myPlayer = players.find(p => p.id === my_player_id)
+    if (!myPlayer) return
+    
+    await fetch('/api/game/ready', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        playerId: my_player_id,
+        isReady: !myPlayer.is_ready
+      })
+    })
+  }
+
+  const startGame = async () => {
+    await fetch('/api/game/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomId })
+    })
+  }
 
   if (loading) {
     return (
@@ -69,6 +96,11 @@ export default function GamePage() {
       </div>
     )
   }
+
+  const myPlayer = players.find(p => p.id === my_player_id)
+  const allReady = players.length >= 2 && players.every(p => p.is_ready)
+  const isPlaying = room.status === 'playing'
+  const isMyTurn = myPlayer && room.current_turn === myPlayer.player_index
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-800 to-green-600 p-8">
@@ -88,10 +120,10 @@ export default function GamePage() {
         </div>
 
         {/* Players List */}
-        <div className="bg-white rounded-lg shadow-lg p-6">
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
           <h2 className="text-xl font-bold mb-4">Players ({players.length}/{room.max_players})</h2>
           <div className="space-y-2">
-            {players.map((player, index) => (
+            {players.map((player) => (
               <div
                 key={player.id}
                 className={`p-3 rounded-lg ${
@@ -108,11 +140,11 @@ export default function GamePage() {
                     }`}>
                       {player.is_ready ? 'Ready' : 'Not Ready'}
                     </span>
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      player.is_connected ? 'bg-blue-500 text-white' : 'bg-red-500 text-white'
-                    }`}>
-                      {player.is_connected ? 'Online' : 'Offline'}
-                    </span>
+                    {isPlaying && room.current_turn === player.player_index && (
+                      <span className="px-2 py-1 rounded text-xs bg-yellow-500 text-white">
+                        Current Turn
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -120,11 +152,61 @@ export default function GamePage() {
           </div>
         </div>
 
-        {/* Game status */}
-        <div className="mt-8 text-center text-white">
-          <p className="text-lg">Status: <span className="font-bold">{room.status}</span></p>
-          <p className="text-sm mt-2">Game functionality coming soon!</p>
-        </div>
+        {/* Game Controls */}
+        {!isPlaying && (
+          <div className="text-center space-y-4">
+            <button
+              onClick={toggleReady}
+              className={`px-8 py-3 rounded-lg font-bold text-white ${
+                myPlayer?.is_ready 
+                  ? 'bg-red-600 hover:bg-red-700' 
+                  : 'bg-green-600 hover:bg-green-700'
+              }`}
+            >
+              {myPlayer?.is_ready ? 'Not Ready' : 'Ready'}
+            </button>
+
+            {allReady && (
+              <div>
+                <button
+                  onClick={startGame}
+                  className="px-8 py-3 rounded-lg font-bold text-white bg-blue-600 hover:bg-blue-700"
+                >
+                  Start Game
+                </button>
+                <p className="text-white text-sm mt-2">All players ready! Click to start.</p>
+              </div>
+            )}
+
+            {!allReady && players.length >= 2 && (
+              <p className="text-white">Waiting for all players to be ready...</p>
+            )}
+
+            {players.length < 2 && (
+              <p className="text-white">Waiting for more players to join...</p>
+            )}
+          </div>
+        )}
+
+        {/* Game Board - Only show when playing */}
+        {isPlaying && myPlayer && (
+          <div className="mt-8">
+            <div className="text-center mb-8">
+              <h2 className="text-white text-2xl font-bold">
+                {isMyTurn ? "Your Turn!" : `${players[room.current_turn]?.username}'s Turn`}
+              </h2>
+            </div>
+
+            {/* Your Hand */}
+            <div className="fixed bottom-8 left-0 right-0">
+              <PlayerHand
+                cards={myPlayer.hand}
+                isMyTurn={!!isMyTurn}
+                onCardClick={(card) => console.log('Card clicked:', card)}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
