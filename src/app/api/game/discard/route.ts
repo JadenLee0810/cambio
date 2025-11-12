@@ -4,80 +4,75 @@ import { createClient } from '@/lib/supabase/server'
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { roomId, playerId, cardId, replaceCardIndex } = await request.json()
-
+    const { roomId, playerId, cardId } = await request.json()
+    
     // Get current game state
     const { data: room } = await supabase
       .from('game_rooms')
       .select('*')
       .eq('id', roomId)
       .single()
-
-    const { data: playersRaw } = await supabase
+    
+    const { data: player } = await supabase
+      .from('players')
+      .select('*')
+      .eq('id', playerId)
+      .single()
+    
+    const { data: allPlayers } = await supabase
       .from('players')
       .select('*')
       .eq('room_id', roomId)
-      .order('player_index', { ascending: true })
-
-    // Guard: players may be null or empty
-    if (!room || !playersRaw || playersRaw.length === 0) {
-      return NextResponse.json({ error: 'Room or players not found' }, { status: 404 })
+      .order('player_index')
+    
+    if (!room || !player || !allPlayers) {
+      return NextResponse.json({ error: 'Room or player not found' }, { status: 404 })
     }
-
-    const players = playersRaw // now narrowed to a non-empty array
-
-    const player = players.find(p => p.id === playerId)
-    if (!player) {
-      return NextResponse.json({ error: 'Player not found' }, { status: 404 })
-    }
-
+    
     // Check if it's player's turn
     if (room.current_turn !== player.player_index) {
       return NextResponse.json({ error: 'Not your turn' }, { status: 400 })
     }
-
-    // Find card being discarded (temporary card from draw)
-    const cardToDiscard = { id: cardId } // This would be the drawn card
-
-    // Add to discard pile (ensure array)
-    const updatedDiscardPile = [ ...(room.discard_pile ?? []), cardToDiscard ]
-
-    // Update player's hand if replacing a card
-    let updatedHand = player.hand
-    if (replaceCardIndex !== undefined && replaceCardIndex !== null) {
-      updatedHand = [...player.hand]
-      updatedHand[replaceCardIndex] = {
-        ...cardToDiscard,
-        isFaceUp: false,
-        position: replaceCardIndex,
-      }
-
-      await supabase
-        .from('players')
-        .update({ hand: updatedHand })
-        .eq('id', playerId)
+    
+    // Find card in player's hand
+    const cardIndex = player.hand.findIndex((c: any) => c.id === cardId)
+    if (cardIndex === -1) {
+      return NextResponse.json({ error: 'Card not in hand' }, { status: 400 })
     }
-
-    // Advance turn (players is guaranteed)
-    const nextTurn = (room.current_turn + 1) % players.length
-
+    
+    const discardedCard = player.hand[cardIndex]
+    const newHand = player.hand.filter((c: any) => c.id !== cardId)
+    
+    // Update player hand
+    await supabase
+      .from('players')
+      .update({ hand: newHand })
+      .eq('id', playerId)
+    
+    // Add to discard pile
+    const newDiscardPile = [...room.discard_pile, discardedCard]
+    
+    // Advance turn
+    const nextTurn = (room.current_turn + 1) % allPlayers.length
+    
+    // Update room
     await supabase
       .from('game_rooms')
       .update({
-        discard_pile: updatedDiscardPile,
-        current_turn: nextTurn,
+        discard_pile: newDiscardPile,
+        current_turn: nextTurn
       })
       .eq('id', roomId)
-
+    
     // Log action
     await supabase.from('game_actions').insert({
       room_id: roomId,
       player_id: playerId,
       action_type: 'discard',
-      action_data: { cardId, replaceCardIndex },
-      result: 'success',
+      action_data: { cardId },
+      result: 'success'
     })
-
+    
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Discard error:', error)

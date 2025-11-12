@@ -4,8 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { playerId, cardIndex } = await request.json()
+    const { playerId, cardId } = await request.json()
     
+    // Get player
     const { data: player } = await supabase
       .from('players')
       .select('*')
@@ -16,39 +17,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Player not found' }, { status: 404 })
     }
     
-    // Temporarily reveal the card
-    const updatedHand = [...player.hand]
-    updatedHand[cardIndex] = {
-      ...updatedHand[cardIndex],
-      isFaceUp: true
-    }
+    // Find card and flip it
+    const newHand = player.hand.map((c: any) => {
+      if (c.id === cardId) {
+        return { ...c, isFaceUp: true }
+      }
+      return c
+    })
     
+    // Update player hand
     await supabase
       .from('players')
-      .update({ hand: updatedHand })
+      .update({ hand: newHand })
       .eq('id', playerId)
-    
-    // Auto-hide after 3 seconds
-    setTimeout(async () => {
-      const { data: currentPlayer } = await supabase
-        .from('players')
-        .select('*')
-        .eq('id', playerId)
-        .single()
-      
-      if (currentPlayer) {
-        const reHiddenHand = [...currentPlayer.hand]
-        reHiddenHand[cardIndex] = {
-          ...reHiddenHand[cardIndex],
-          isFaceUp: false
-        }
-        
-        await supabase
-          .from('players')
-          .update({ hand: reHiddenHand })
-          .eq('id', playerId)
-      }
-    }, 3000)
     
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -29,29 +29,29 @@ export async function POST(request: NextRequest) {
     }
     
     let drawnCard
-    let updatedDeck = room.deck
-    let updatedDiscardPile = room.discard_pile
+    let newDeck = room.deck
+    let newDiscardPile = room.discard_pile
     
     if (source === 'deck') {
       if (room.deck.length === 0) {
         return NextResponse.json({ error: 'Deck is empty' }, { status: 400 })
       }
       drawnCard = room.deck[room.deck.length - 1]
-      updatedDeck = room.deck.slice(0, -1)
+      newDeck = room.deck.slice(0, -1)
     } else if (source === 'discard') {
       if (room.discard_pile.length === 0) {
         return NextResponse.json({ error: 'Discard pile is empty' }, { status: 400 })
       }
       drawnCard = room.discard_pile[room.discard_pile.length - 1]
-      updatedDiscardPile = room.discard_pile.slice(0, -1)
+      newDiscardPile = room.discard_pile.slice(0, -1)
     }
     
     // Update room
     await supabase
       .from('game_rooms')
       .update({
-        deck: updatedDeck,
-        discard_pile: updatedDiscardPile
+        deck: newDeck,
+        discard_pile: newDiscardPile
       })
       .eq('id', roomId)
     
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       room_id: roomId,
       player_id: playerId,
       action_type: source === 'deck' ? 'draw_from_deck' : 'draw_from_discard',
-      action_data: { card: drawnCard },
+      action_data: { cardId: drawnCard.id },
       result: 'success'
     })
     
