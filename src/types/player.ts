@@ -10,4 +10,5 @@ export interface Player {
   is_ready: boolean
   is_connected: boolean
   last_action_at: string
+  has_peeked?: boolean
 }

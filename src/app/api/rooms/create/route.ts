@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
   // Create shuffled deck
   const deck = shuffleDeck(createDeck())
   
-  // Create room
+  // Create room (without creator_id first)
   const { data: room, error: roomError } = await supabase
     .from('game_rooms')
     .insert({
@@ -51,8 +51,14 @@ export async function POST(request: NextRequest) {
   if (playerError) {
     return NextResponse.json({ error: playerError.message }, { status: 500 })
   }
+
+  // Update room with creator_id
+  await supabase
+    .from('game_rooms')
+    .update({ creator_id: player.id })
+    .eq('id', room.id)
   
-  return NextResponse.json({ room, player })
+  return NextResponse.json({ room: { ...room, creator_id: player.id }, player })
 }
 
 function generateRoomCode(): string {

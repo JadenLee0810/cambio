@@ -5,18 +5,20 @@ export type GamePhase = 'setup' | 'playing' | 'showdown' | 'ended'
 export type GameStatus = 'waiting' | 'playing' | 'finished'
 
 export interface GameRoom {
-    id: string
-    room_code: string
-    status: GameStatus
-    game_phase: GamePhase
-    current_turn: number
-    max_players: number
-    deck: Card[]
-    discard_pile: Card[]
-    created_at: string
-    started_at?: string
-    finished_at?: string
-    settings: GameSettings
+  id: string
+  room_code: string
+  status: GameStatus
+  game_phase: GamePhase
+  current_turn: number
+  max_players: number
+  deck: Card[]
+  discard_pile: Card[]
+  created_at: string
+  started_at?: string
+  finished_at?: string
+  settings: GameSettings
+  creator_id?: string
+  cambio_caller_id?: string
 }
 
 export interface GameSettings {

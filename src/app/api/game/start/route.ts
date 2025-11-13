@@ -39,9 +39,11 @@ export async function POST(request: NextRequest) {
   for (const player of players) {
     const hand = []
     for (let i = 0; i < cardsPerPlayer; i++) {
+      // Show bottom 2 cards (position 2 and 3 in 2x2 grid)
+      const isFaceUp = i === 2 || i === 3
       hand.push({
         ...deck[deckIndex++],
-        isFaceUp: false,
+        isFaceUp: isFaceUp,
         position: i
       })
     }
@@ -49,7 +51,11 @@ export async function POST(request: NextRequest) {
     // Update player's hand
     await supabase
       .from('players')
-      .update({ hand })
+      .update({ 
+        hand,
+        has_peeked: false,
+        is_ready: false // Reset ready status for peek phase
+      })
       .eq('id', player.id)
   }
   
@@ -57,12 +63,12 @@ export async function POST(request: NextRequest) {
   const discardPile = [deck[deckIndex++]]
   const remainingDeck = deck.slice(deckIndex)
   
-  // Update room to started
+  // Update room to started with peek phase
   const { data: updatedRoom, error } = await supabase
     .from('game_rooms')
     .update({
       status: 'playing',
-      game_phase: 'playing',
+      game_phase: 'setup', // Start in setup phase for peeking
       started_at: new Date().toISOString(),
       deck: remainingDeck,
       discard_pile: discardPile,

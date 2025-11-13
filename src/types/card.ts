@@ -13,7 +13,8 @@ export type CardPower =
   | 'peek_own'
   | 'peek_opponent'
   | 'swap'
-  | 'blind_swap'
+  | 'blind_swap'  // This is now for J/Q
+  | 'black_king'  // New: Black King special power
   | 'wild'
 
 export interface CardInHand extends Card {

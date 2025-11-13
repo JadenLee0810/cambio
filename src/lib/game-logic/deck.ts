@@ -5,14 +5,22 @@ export const createDeck = (): Card[] => {
   const ranks: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
   const deck: Card[] = []
   
+  // Standard 52 cards
   suits.forEach(suit => {
     ranks.forEach((rank) => {
+      let value = getCardValue(rank)
+      
+      // Red Kings are -1, Black Kings are 13
+      if (rank === 'K') {
+        value = (suit === 'hearts' || suit === 'diamonds') ? -1 : 13
+      }
+      
       deck.push({
         id: `${suit}-${rank}`,
         suit,
         rank,
-        value: getCardValue(rank),
-        power: getCardPower(rank)
+        value: value,
+        power: getCardPower(rank, suit)
       })
     })
   })
@@ -37,21 +45,22 @@ export const createDeck = (): Card[] => {
   
   return deck
 }
-
 const getCardValue = (rank: Rank): number => {
   const values: Record<Rank, number> = {
     'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
-    '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 0,
+    '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, // Kings default to 13 (black)
     'JOKER': 0
   }
   return values[rank]
 }
-
-const getCardPower = (rank: Rank) => {
+const getCardPower = (rank: Rank, suit: Suit) => {
   if (rank === '7' || rank === '8') return 'peek_own'
   if (rank === '9' || rank === '10') return 'peek_opponent'
   if (rank === 'J' || rank === 'Q') return 'swap'
-  if (rank === 'K') return 'blind_swap'
+  if (rank === 'K') {
+    // Black Kings have special power, Red Kings don't
+    return (suit === 'clubs' || suit === 'spades') ? 'black_king' : undefined
+  }
   return undefined
 }
 

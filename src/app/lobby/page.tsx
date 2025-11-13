@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion } from 'framer-motion'
 
 export default function Lobby() {
   const router = useRouter()
@@ -29,7 +30,7 @@ export default function Lobby() {
       const data = await response.json()
       if (data.room) {
         localStorage.setItem('playerId', data.player.id)
-        router.push(`/game/${data.room.id}`)
+        router.push(`/waiting/${data.room.id}`)
       } else {
         setError(data.error || 'Failed to create room')
       }
@@ -62,7 +63,7 @@ export default function Lobby() {
       const data = await response.json()
       if (data.room) {
         localStorage.setItem('playerId', data.player.id)
-        router.push(`/game/${data.room.id}`)
+        router.push(`/waiting/${data.room.id}`)
       } else {
         setError(data.error || 'Failed to join room')
       }
@@ -74,12 +75,21 @@ export default function Lobby() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-800 to-green-600 flex items-center justify-center">
-      <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full">
-        <h1 className="text-3xl font-bold text-center mb-8">Cambio Card Game</h1>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="bg-slate-800 rounded-3xl shadow-2xl p-10 max-w-md w-full border border-slate-700"
+      >
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-serif font-bold text-white mb-2">Cambio</h1>
+          <p className="text-slate-400">Join or create a game</p>
+        </div>
         
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg mb-6">
             {error}
           </div>
         )}
@@ -90,24 +100,24 @@ export default function Lobby() {
             placeholder="Enter your username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-400"
             onKeyPress={(e) => e.key === 'Enter' && createRoom()}
           />
           
           <button
             onClick={createRoom}
             disabled={!username || isCreating}
-            className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-lg hover:shadow-lg hover:shadow-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all"
           >
             {isCreating ? 'Creating...' : 'Create New Room'}
           </button>
           
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
+              <div className="w-full border-t border-slate-700"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">OR</span>
+              <span className="px-2 bg-slate-800 text-slate-500">OR</span>
             </div>
           </div>
           
@@ -116,7 +126,7 @@ export default function Lobby() {
             placeholder="Enter room code"
             value={roomCode}
             onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-400 font-mono"
             maxLength={6}
             onKeyPress={(e) => e.key === 'Enter' && joinRoom()}
           />
@@ -124,12 +134,20 @@ export default function Lobby() {
           <button
             onClick={joinRoom}
             disabled={!username || !roomCode || isJoining}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-slate-700 text-white py-3 rounded-lg hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all border border-slate-600"
           >
             {isJoining ? 'Joining...' : 'Join Room'}
           </button>
         </div>
-      </div>
+
+        {/* Back button */}
+        <button
+          onClick={() => router.push('/')}
+          className="w-full mt-6 text-slate-400 hover:text-white text-sm transition-colors"
+        >
+          ← Back to Home
+        </button>
+      </motion.div>
     </div>
   )
 }

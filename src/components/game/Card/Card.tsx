@@ -20,6 +20,7 @@ export const Card = ({ card, isFaceUp, isPlayable, onClick, className }: CardPro
       onClick={onClick}
       whileHover={isPlayable ? { scale: 1.05, y: -10 } : {}}
       whileTap={isPlayable ? { scale: 0.95 } : {}}
+      initial={{ rotateY: isFaceUp ? 0 : 180 }}
       animate={{ rotateY: isFaceUp ? 0 : 180 }}
       transition={{ duration: 0.6 }}
       style={{ transformStyle: 'preserve-3d' }}
