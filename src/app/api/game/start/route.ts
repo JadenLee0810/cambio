@@ -59,8 +59,8 @@ export async function POST(request: NextRequest) {
       .eq('id', player.id)
   }
   
-  // Put one card in discard pile
-  const discardPile = [deck[deckIndex++]]
+  // Start with EMPTY discard pile
+  const discardPile: any[] = []
   const remainingDeck = deck.slice(deckIndex)
   
   // Update room to started with peek phase

@@ -1,55 +1,31 @@
 'use client'
 
-import { Card } from '@/components/game/Card/Card'
+import { Card } from '../Card/Card'
 import { CardInHand } from '@/types/card'
-import { motion } from 'framer-motion'
 
 interface PlayerHandProps {
-  cards: CardInHand[]
-  onCardClick?: (card: CardInHand) => void
+  cards: (CardInHand | null)[]
   isMyTurn: boolean
+  onCardClick: (card: CardInHand) => void
 }
 
-export const PlayerHand = ({ cards, onCardClick, isMyTurn }: PlayerHandProps) => {
+export const PlayerHand = ({ cards, isMyTurn, onCardClick }: PlayerHandProps) => {
   return (
-    <div className="flex flex-col gap-4 items-center">
-      {/* Top row - 2 cards */}
-      <div className="flex gap-4">
-        {cards.slice(0, 2).map((card, index) => (
-          <motion.div
-            key={card.id}
-            initial={{ opacity: 0, y: 100 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-          >
+    <div className="grid grid-cols-2 gap-2">
+      {cards.map((card, index) => (
+        <div key={card?.id || `empty-${index}`}>
+          {card ? (
             <Card
               card={card}
               isFaceUp={card.isFaceUp}
               isPlayable={isMyTurn}
-              onClick={() => onCardClick?.(card)}
+              onClick={() => onCardClick(card)}
             />
-          </motion.div>
-        ))}
-      </div>
-      
-      {/* Bottom row - 2 cards */}
-      <div className="flex gap-4">
-        {cards.slice(2, 4).map((card, index) => (
-          <motion.div
-            key={card.id}
-            initial={{ opacity: 0, y: 100 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: (index + 2) * 0.1 }}
-          >
-            <Card
-              card={card}
-              isFaceUp={card.isFaceUp}
-              isPlayable={isMyTurn}
-              onClick={() => onCardClick?.(card)}
-            />
-          </motion.div>
-        ))}
-      </div>
+          ) : (
+            <div className="w-24 h-36 border-2 border-dashed border-gray-600 rounded-lg bg-gray-800/50"></div>
+          )}
+        </div>
+      ))}
     </div>
   )
 }

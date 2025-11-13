@@ -91,12 +91,17 @@ export async function POST(request: NextRequest) {
         .eq('id', roomId)
     }
     
-    // Advance turn
-    const nextTurn = (room.current_turn + 1) % allPlayers.length
-    await supabase
-      .from('game_rooms')
-      .update({ current_turn: nextTurn })
-      .eq('id', roomId)
+    // DON'T advance turn yet if there's a power and player wants to use it
+    const hasPower = discardedCard.power && discardedCard.power !== 'wild'
+    
+    if (!hasPower || usePower === false) {
+      // No power or player skipped power - advance turn
+      const nextTurn = (room.current_turn + 1) % allPlayers.length
+      await supabase
+        .from('game_rooms')
+        .update({ current_turn: nextTurn })
+        .eq('id', roomId)
+    }
     
     // Log action
     await supabase.from('game_actions').insert({
@@ -110,8 +115,9 @@ export async function POST(request: NextRequest) {
     // Return info about the discarded card's power
     return NextResponse.json({ 
       success: true,
-      power: discardedCard.power,
-      card: discardedCard
+      power: hasPower ? discardedCard.power : null,
+      card: discardedCard,
+      shouldActivatePower: hasPower && usePower !== false
     })
   } catch (error) {
     console.error('Discard error:', error)
