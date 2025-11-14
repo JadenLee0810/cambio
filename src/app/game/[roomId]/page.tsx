@@ -24,6 +24,8 @@ export default function GamePage() {
   const [selectedOpponent, setSelectedOpponent] = useState<string | null>(null)
   const [selectedPlayer1, setSelectedPlayer1] = useState<string | null>(null)
   const [selectedPlayer2, setSelectedPlayer2] = useState<string | null>(null)
+  const [selectedCard1Id, setSelectedCard1Id] = useState<string | null>(null)
+  const [selectedCard2Id, setSelectedCard2Id] = useState<string | null>(null)
   const [revealedCard, setRevealedCard] = useState<CardType | null>(null)
   const [revealedCards, setRevealedCards] = useState<CardType[]>([])
   const [showPowerChoice, setShowPowerChoice] = useState(false)
@@ -32,6 +34,8 @@ export default function GamePage() {
   const [isRaceMode, setIsRaceMode] = useState(false)
   const [selectingCardToGive, setSelectingCardToGive] = useState(false)
   const [pendingRaceDiscard, setPendingRaceDiscard] = useState<{opponentId: string, cardId: string} | null>(null)
+  const [myLastTurnIndex, setMyLastTurnIndex] = useState<number | null>(null)
+  const [hasDrawn, setHasDrawn] = useState(false)
   
   const {
     room,
@@ -80,6 +84,16 @@ export default function GamePage() {
     return () => unsubscribe()
   }, [roomId])
 
+  // Reset hasDrawn when turn changes to my turn
+  useEffect(() => {
+    if (room && myPlayer) {
+      const isMyTurn = room.current_turn === myPlayer.player_index
+      if (isMyTurn) {
+        setHasDrawn(false)
+      }
+    }
+  }, [room?.current_turn, myPlayer?.player_index])
+
   const confirmPeek = async () => {
     await fetch('/api/game/confirm-peek', {
       method: 'POST',
@@ -92,6 +106,7 @@ export default function GamePage() {
   }
 
   const handleDrawDeck = async () => {
+    setHasDrawn(true)
     const response = await fetch('/api/game/draw', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -109,6 +124,7 @@ export default function GamePage() {
   }
 
   const handleDrawDiscard = async () => {
+    setHasDrawn(true)
     const response = await fetch('/api/game/draw', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -141,12 +157,38 @@ export default function GamePage() {
     })
     
     const data = await response.json()
+    setDrawnCard(null)
+    
     if (data.success && data.shouldActivatePower && data.power) {
       setPendingPower(data.power)
       setShowPowerChoice(true)
+    } else {
+      // Auto end turn
+      await completeTurn()
     }
+  }
+
+  const handleAddDrawnCard = async () => {
+    if (!drawnCard) return
+    
+    const supabase = createClient()
+    
+    // Add the drawn card to hand
+    const newHand = [...myPlayer!.hand, {
+      ...drawnCard,
+      isFaceUp: false,
+      position: myPlayer!.hand.length
+    }]
+    
+    await supabase
+      .from('players')
+      .update({ hand: newHand })
+      .eq('id', my_player_id)
     
     setDrawnCard(null)
+    
+    // DO NOT activate power when adding to hand - just end turn
+    await completeTurn()
   }
 
   const handleSwapWithDrawnCard = async (handCardId: string) => {
@@ -208,23 +250,35 @@ export default function GamePage() {
           .eq('id', roomId)
       }
       
-      if (cardToReplace.power && cardToReplace.power !== 'wild') {
-        setPendingPower(cardToReplace.power)
+      const replacedCardPower = cardToReplace.power
+      setDrawnCard(null)
+      
+      if (replacedCardPower && replacedCardPower !== 'wild') {
+        // Map card power to game power mode
+        let gamePower = replacedCardPower
+        if (replacedCardPower === 'black_king') {
+          gamePower = 'blind_swap'
+        }
+        setPendingPower(gamePower)
         setShowPowerChoice(true)
       } else {
+        // Auto end turn
         await completeTurn()
       }
     }
-    
-    setDrawnCard(null)
   }
 
   const completeTurn = async () => {
+    if (myPlayer) {
+      setMyLastTurnIndex(myPlayer.player_index)
+    }
+    
     await fetch('/api/game/complete-turn', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ roomId })
     })
+    setHasDrawn(false)
   }
 
   const handleUsePower = (power: string) => {
@@ -236,6 +290,7 @@ export default function GamePage() {
   const handleSkipPower = async () => {
     setShowPowerChoice(false)
     setPendingPower(null)
+    // Auto end turn after skipping power
     await completeTurn()
   }
 
@@ -250,11 +305,21 @@ export default function GamePage() {
     })
     
     const data = await response.json()
+    
+    if (!response.ok || !data.success) {
+      // Card was removed (probably by race discard)
+      alert('That card is no longer available!')
+      setActivePower(null)
+      await completeTurn()
+      return
+    }
+    
     if (data.success && data.card) {
       setRevealedCard(data.card)
       setTimeout(async () => {
         setRevealedCard(null)
         setActivePower(null)
+        // Auto end turn after peek
         await completeTurn()
       }, 3000)
     }
@@ -262,17 +327,29 @@ export default function GamePage() {
 
   const handlePeekOpponentCard = async (opponentId: string, cardId: string) => {
     const opponent = players.find(p => p.id === opponentId)
-    if (!opponent) return
+    if (!opponent) {
+      alert('Player not found!')
+      setActivePower(null)
+      await completeTurn()
+      return
+    }
     
     const card = opponent.hand.find((c: any) => c && c.id === cardId)
-    if (card) {
-      setRevealedCard(card)
-      setTimeout(async () => {
-        setRevealedCard(null)
-        setActivePower(null)
-        await completeTurn()
-      }, 3000)
+    if (!card) {
+      // Card was removed (probably by race discard)
+      alert('That card is no longer available!')
+      setActivePower(null)
+      await completeTurn()
+      return
     }
+    
+    setRevealedCard(card)
+    setTimeout(async () => {
+      setRevealedCard(null)
+      setActivePower(null)
+      // Auto end turn after peek
+      await completeTurn()
+    }, 3000)
   }
 
   const handleBlindSwap = async (card1Id: string, card2Id: string, player1Id: string, player2Id: string) => {
@@ -304,52 +381,138 @@ export default function GamePage() {
     setSelectedOpponent(null)
     setSelectedPlayer1(null)
     setSelectedPlayer2(null)
+    
+    // Auto end turn after blind swap
     await completeTurn()
   }
 
   const handleSwap = async (card1Id: string, card2Id: string, player1Id: string, player2Id: string) => {
+    console.log('=== BLACK KING SWAP START ===')
+    console.log('Input params:', { card1Id, card2Id, player1Id, player2Id })
+    
     const supabase = createClient()
     
     const { data: player1 } = await supabase.from('players').select('*').eq('id', player1Id).single()
     const { data: player2 } = await supabase.from('players').select('*').eq('id', player2Id).single()
     
-    if (!player1 || !player2) return
+    console.log('Players fetched:', { 
+      player1: player1?.username, 
+      player2: player2?.username,
+      player1Hand: player1?.hand,
+      player2Hand: player2?.hand
+    })
+    
+    if (!player1 || !player2) {
+      console.error('ERROR: Players not found!')
+      return
+    }
     
     const card1 = player1.hand.find((c: any) => c && c.id === card1Id)
     const card2 = player2.hand.find((c: any) => c && c.id === card2Id)
     
-    if (!card1 || !card2) return
+    console.log('Cards found:', { 
+      card1: card1 ? `${card1.rank} of ${card1.suit}` : 'NOT FOUND',
+      card2: card2 ? `${card2.rank} of ${card2.suit}` : 'NOT FOUND'
+    })
     
-    // Show both cards
+    if (!card1 || !card2) {
+      console.error('ERROR: Cards not found in hands!')
+      console.log('Looking for card1 ID:', card1Id, 'in player1 hand:', player1.hand.map((c: any) => c?.id))
+      console.log('Looking for card2 ID:', card2Id, 'in player2 hand:', player2.hand.map((c: any) => c?.id))
+      return
+    }
+    
+    // Store the actual card IDs from the hands
+    setSelectedCard1Id(card1.id)
+    setSelectedCard2Id(card2.id)
+    
+    console.log('Setting revealed cards and showing modal')
+    console.log('Revealed cards:', [card1, card2])
+    
+    // Show both cards for Black King
     setRevealedCards([card1, card2])
     setShowSwapChoice(true)
+    
+    console.log('=== BLACK KING SWAP SETUP COMPLETE ===')
   }
 
   const handleConfirmSwap = async () => {
-    if (!selectedCard || !selectedPlayer1 || !selectedPlayer2) return
+    console.log('=== CONFIRM SWAP START ===')
+    console.log('State:', { 
+      selectedCard1Id, 
+      selectedCard2Id, 
+      selectedPlayer1, 
+      selectedPlayer2,
+      revealedCards: revealedCards.length
+    })
+    
+    if (!selectedCard1Id || !selectedCard2Id) {
+      console.error('ERROR: Card IDs not set!')
+      return
+    }
+    
+    if (!selectedPlayer1 || !selectedPlayer2) {
+      console.error('ERROR: Player IDs not set!')
+      return
+    }
+    
+    if (revealedCards.length !== 2) {
+      console.error('ERROR: Not exactly 2 revealed cards!', revealedCards.length)
+      return
+    }
     
     const supabase = createClient()
     
     const { data: player1 } = await supabase.from('players').select('*').eq('id', selectedPlayer1).single()
     const { data: player2 } = await supabase.from('players').select('*').eq('id', selectedPlayer2).single()
     
-    if (!player1 || !player2) return
+    console.log('Players re-fetched:', { 
+      player1: player1?.username, 
+      player2: player2?.username 
+    })
     
-    const card1 = player1.hand.find((c: any) => c && c.id === selectedCard)
-    const card2 = player2.hand.find((c: any) => c && c.id === revealedCards[1]?.id)
+    if (!player1 || !player2) {
+      console.error('ERROR: Failed to re-fetch players!')
+      return
+    }
     
-    if (!card1 || !card2) return
+    const card1 = player1.hand.find((c: any) => c && c.id === selectedCard1Id)
+    const card2 = player2.hand.find((c: any) => c && c.id === selectedCard2Id)
     
-    const newHand1 = player1.hand.map((c: any) => 
-      c && c.id === selectedCard ? { ...card2, position: card1.position, isFaceUp: false } : c
-    )
+    console.log('Cards found in current hands:', { 
+      card1: card1 ? `${card1.rank} of ${card1.suit}` : 'NOT FOUND',
+      card2: card2 ? `${card2.rank} of ${card2.suit}` : 'NOT FOUND'
+    })
     
-    const newHand2 = player2.hand.map((c: any) => 
-      c && c.id === card2.id ? { ...card1, position: card2.position, isFaceUp: false } : c
-    )
+    if (!card1 || !card2) {
+      console.error('ERROR: Cards not found in current hands!')
+      console.log('Player1 hand IDs:', player1.hand.map((c: any) => c?.id))
+      console.log('Player2 hand IDs:', player2.hand.map((c: any) => c?.id))
+      return
+    }
+    
+    const newHand1 = player1.hand.map((c: any) => {
+      if (c && c.id === selectedCard1Id) {
+        console.log('Replacing card1 with card2')
+        return { ...card2, position: card1.position, isFaceUp: false }
+      }
+      return c
+    })
+    
+    const newHand2 = player2.hand.map((c: any) => {
+      if (c && c.id === selectedCard2Id) {
+        console.log('Replacing card2 with card1')
+        return { ...card1, position: card2.position, isFaceUp: false }
+      }
+      return c
+    })
+    
+    console.log('New hands created, updating database...')
     
     await supabase.from('players').update({ hand: newHand1 }).eq('id', selectedPlayer1)
     await supabase.from('players').update({ hand: newHand2 }).eq('id', selectedPlayer2)
+    
+    console.log('Database updated successfully!')
     
     setShowSwapChoice(false)
     setRevealedCards([])
@@ -358,6 +521,12 @@ export default function GamePage() {
     setSelectedOpponent(null)
     setSelectedPlayer1(null)
     setSelectedPlayer2(null)
+    setSelectedCard1Id(null)
+    setSelectedCard2Id(null)
+    
+    console.log('=== CONFIRM SWAP COMPLETE ===')
+    
+    // Auto end turn after swap
     await completeTurn()
   }
 
@@ -369,6 +538,10 @@ export default function GamePage() {
     setSelectedOpponent(null)
     setSelectedPlayer1(null)
     setSelectedPlayer2(null)
+    setSelectedCard1Id(null)
+    setSelectedCard2Id(null)
+    
+    // Auto end turn after declining swap
     await completeTurn()
   }
 
@@ -448,6 +621,8 @@ export default function GamePage() {
     
     if (!response.ok) {
       alert(data.error || 'Failed to call Cambio')
+    } else {
+      setMyLastTurnIndex(null)
     }
   }
 
@@ -465,56 +640,95 @@ export default function GamePage() {
   const handleCardClick = (card: any, playerId?: string) => {
     const actualPlayerId = playerId || my_player_id!
     
+    console.log('=== CARD CLICKED ===')
+    console.log('Card:', card)
+    console.log('Player ID:', actualPlayerId)
+    console.log('Current state:', {
+      selectingCardToGive,
+      isRaceMode,
+      drawnCard: !!drawnCard,
+      isMyTurn,
+      activePower,
+      selectedCard
+    })
+    
     if (selectingCardToGive) {
+      console.log('Action: Selecting card to give')
       handleSelectCardToGive(card.id)
     } else if (isRaceMode && actualPlayerId === my_player_id) {
+      console.log('Action: Race discard')
       handleRaceDiscard(card.id)
     } else if (drawnCard && isMyTurn && !activePower) {
+      console.log('Action: Swap with drawn card')
       handleSwapWithDrawnCard(card.id)
     } else if (activePower === 'peek_own') {
+      console.log('Action: Peek own card')
       handlePeekOwnCard(card.id)
-    } else if (activePower === 'blind_swap') {
-      // Q and J - blind swap WITHOUT viewing
+    } else if (activePower === 'swap') {
+      // Jack/Queen - blind swap WITHOUT viewing
       if (!selectedCard) {
+        console.log('Action: Selecting FIRST card for blind swap')
         setSelectedCard(card.id)
         setSelectedPlayer1(actualPlayerId)
       } else {
+        console.log('Action: Selecting SECOND card for blind swap - calling handleBlindSwap')
         handleBlindSwap(selectedCard, card.id, selectedPlayer1!, actualPlayerId)
       }
-    } else if (activePower === 'swap') {
+    } else if (activePower === 'blind_swap') {
       // Black King - VIEW both cards then choose
       if (!selectedCard) {
+        console.log('Action: Selecting FIRST card for Black King swap')
         setSelectedCard(card.id)
         setSelectedPlayer1(actualPlayerId)
       } else {
+        console.log('Action: Selecting SECOND card for Black King swap - calling handleSwap')
         setSelectedPlayer2(actualPlayerId)
         handleSwap(selectedCard, card.id, selectedPlayer1!, actualPlayerId)
       }
+    } else {
+      console.log('Action: NONE - no matching condition')
     }
   }
 
   const handleOpponentCardClick = (opponent: Player, card: any) => {
+    console.log('=== OPPONENT CARD CLICKED ===')
+    console.log('Opponent:', opponent.username)
+    console.log('Card:', card)
+    console.log('Current state:', {
+      isRaceMode,
+      activePower,
+      selectedCard
+    })
+    
     if (isRaceMode) {
+      console.log('Action: Race discard opponent')
       handleRaceDiscardOpponent(opponent.id, card.id)
     } else if (activePower === 'peek_opponent') {
+      console.log('Action: Peek opponent card')
       handlePeekOpponentCard(opponent.id, card.id)
-    } else if (activePower === 'blind_swap') {
-      // Q and J - blind swap WITHOUT viewing
+    } else if (activePower === 'swap') {
+      // Jack/Queen - blind swap WITHOUT viewing
       if (!selectedCard) {
+        console.log('Action: Selecting FIRST opponent card for blind swap')
         setSelectedCard(card.id)
         setSelectedPlayer1(opponent.id)
       } else {
+        console.log('Action: Selecting SECOND opponent card for blind swap - calling handleBlindSwap')
         handleBlindSwap(selectedCard, card.id, selectedPlayer1!, opponent.id)
       }
-    } else if (activePower === 'swap') {
+    } else if (activePower === 'blind_swap') {
       // Black King - VIEW both cards then choose
       if (!selectedCard) {
+        console.log('Action: Selecting FIRST opponent card for Black King swap')
         setSelectedCard(card.id)
         setSelectedPlayer1(opponent.id)
       } else {
+        console.log('Action: Selecting SECOND opponent card for Black King swap - calling handleSwap')
         setSelectedPlayer2(opponent.id)
         handleSwap(selectedCard, card.id, selectedPlayer1!, opponent.id)
       }
+    } else {
+      console.log('Action: NONE - no matching condition')
     }
   }
 
@@ -542,6 +756,12 @@ export default function GamePage() {
   const isCambioPhase = room.cambio_caller_id !== null && room.cambio_caller_id !== undefined
   const isFrozen = room.cambio_caller_id === my_player_id
 
+  // Can call Cambio only during the next player's turn after I ended my turn
+  const myIndex = myPlayer?.player_index ?? -1
+  const nextPlayerIndex = (myIndex + 1) % players.length
+  const isNextPlayerTurn = room.current_turn === nextPlayerIndex
+  const canCallCambio = myLastTurnIndex === myIndex && isNextPlayerTurn && !isCambioPhase && !isFrozen
+
   if (room && room.status !== 'playing' && room.status !== 'finished') {
     router.push(`/waiting/${roomId}`)
     return null
@@ -551,8 +771,8 @@ export default function GamePage() {
     switch(power) {
       case 'peek_own': return 'Peek at one of your own cards'
       case 'peek_opponent': return 'Peek at an opponent\'s card'
-      case 'swap': return 'View ANY two cards and choose whether to swap them (Black King only)'
-      case 'blind_swap': return 'Blind swap: swap any two cards WITHOUT looking (Q or J)'
+      case 'swap': return 'Blind swap any two cards WITHOUT looking (Q or J)'
+      case 'blind_swap': return 'View ANY two cards and choose whether to swap them (Black King only)'
       default: return 'Use card power'
     }
   }
@@ -569,12 +789,29 @@ export default function GamePage() {
             </div>
             <div className="flex items-center gap-4">
               {isActualGame && (
-                <button
-                  onClick={handleDebugRevealAll}
-                  className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 font-bold text-sm"
-                >
-                  🐛 DEBUG: Reveal All
-                </button>
+                <>
+                  <button
+                    onClick={handleDebugRevealAll}
+                    className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 font-bold text-sm"
+                  >
+                    🐛 DEBUG: Reveal All
+                  </button>
+                  <button
+                    onClick={() => {
+                      console.log('=== DEBUG STATE ===');
+                      console.log('showSwapChoice:', showSwapChoice);
+                      console.log('revealedCards:', revealedCards);
+                      console.log('selectedCard1Id:', selectedCard1Id);
+                      console.log('selectedCard2Id:', selectedCard2Id);
+                      console.log('selectedPlayer1:', selectedPlayer1);
+                      console.log('selectedPlayer2:', selectedPlayer2);
+                      console.log('activePower:', activePower);
+                    }}
+                    className="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700 font-bold text-sm"
+                  >
+                    🐛 DEBUG: State
+                  </button>
+                </>
               )}
               
               {isCambioPhase && (
@@ -663,10 +900,10 @@ export default function GamePage() {
             <p className="font-bold text-lg text-center">
               {activePower === 'peek_own' && '👆 Click one of YOUR cards to peek at it'}
               {activePower === 'peek_opponent' && '👆 Click an OPPONENT\'S card to peek at it'}
-              {activePower === 'blind_swap' && !selectedCard && '👆 Click the FIRST card to swap (Q/J - NO PEEKING!)'}
-              {activePower === 'blind_swap' && selectedCard && '👆 Click the SECOND card to complete blind swap'}
-              {activePower === 'swap' && !selectedCard && '👆 Click the FIRST card (Black King - you\'ll see both!)'}
-              {activePower === 'swap' && selectedCard && '👆 Click the SECOND card to view both and decide'}
+              {activePower === 'swap' && !selectedCard && '👆 Click the FIRST card to swap (Q/J - NO PEEKING!)'}
+              {activePower === 'swap' && selectedCard && '👆 Click the SECOND card to complete blind swap'}
+              {activePower === 'blind_swap' && !selectedCard && '👆 Click the FIRST card (Black King - you\'ll see both!)'}
+              {activePower === 'blind_swap' && selectedCard && '👆 Click the SECOND card to view both and decide'}
             </p>
           </div>
         )}
@@ -806,6 +1043,12 @@ export default function GamePage() {
                 </div>
                 <div className="space-y-2">
                   <button
+                    onClick={handleAddDrawnCard}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded font-bold"
+                  >
+                    Add to Hand
+                  </button>
+                  <button
                     onClick={() => handleDiscardDrawnCard(true)}
                     className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded font-bold"
                   >
@@ -862,33 +1105,25 @@ export default function GamePage() {
               <Deck 
                 cardCount={room.deck.length}
                 onDraw={handleDrawDeck}
-                canDraw={isMyTurn && !drawnCard && !activePower && !isFrozen && !selectingCardToGive}
+                canDraw={isMyTurn && !drawnCard && !activePower && !isFrozen && !selectingCardToGive && !hasDrawn}
               />
               <DiscardPile 
                 cards={room.discard_pile}
                 onDraw={handleDrawDiscard}
-                canDraw={isMyTurn && !drawnCard && !activePower && !isFrozen && room.discard_pile.length > 0 && !selectingCardToGive}
+                canDraw={isMyTurn && !drawnCard && !activePower && !isFrozen && room.discard_pile.length > 0 && !selectingCardToGive && !hasDrawn}
               />
             </div>
 
-            {/* Game Controls */}
-            {isMyTurn && !isFrozen && !activePower && !selectingCardToGive && (
-              <div className="fixed top-24 right-8 bg-slate-800 rounded-lg shadow-lg p-4 space-y-3 min-w-[200px] border border-slate-700">
-                <h3 className="font-bold text-lg text-white">Your Turn</h3>
-                
-                {!drawnCard && (
-                  <div className="space-y-2">
-                    <p className="text-sm text-slate-300">Draw a card{!isCambioPhase && ' or call Cambio'}</p>
-                    {!isCambioPhase && (
-                      <button
-                        onClick={handleCallCambio}
-                        className="w-full bg-yellow-600 text-white py-2 rounded hover:bg-yellow-700 font-bold"
-                      >
-                        🔔 Call Cambio!
-                      </button>
-                    )}
-                  </div>
-                )}
+            {/* Call Cambio Button - Only visible during next player's turn */}
+            {canCallCambio && (
+              <div className="fixed top-24 right-8 bg-yellow-600 rounded-lg shadow-lg p-4 space-y-3 min-w-[200px] border-2 border-yellow-400">
+                <h3 className="font-bold text-lg text-black text-center">Call Cambio?</h3>
+                <button
+                  onClick={handleCallCambio}
+                  className="w-full bg-black text-yellow-400 py-3 rounded hover:bg-gray-900 font-bold text-lg"
+                >
+                  🔔 Call Cambio!
+                </button>
               </div>
             )}
 
@@ -906,26 +1141,46 @@ export default function GamePage() {
         {isGameOver && (
           <div className="text-center space-y-6">
             <h2 className="text-white text-4xl font-bold">Game Over!</h2>
-            <div className="bg-slate-800 rounded-lg shadow-lg p-8 max-w-2xl mx-auto border border-slate-700">
-              <h3 className="text-2xl font-bold mb-4 text-white">Final Scores</h3>
-              <div className="space-y-3">
+            <div className="bg-slate-800 rounded-lg shadow-lg p-8 max-w-4xl mx-auto border border-slate-700">
+              <h3 className="text-2xl font-bold mb-6 text-white">Final Scores</h3>
+              <div className="space-y-6">
                 {[...players]
                   .sort((a, b) => a.score - b.score)
                   .map((player, index) => (
-                    <div
-                      key={player.id}
-                      className={`p-4 rounded-lg ${
-                        index === 0 ? 'bg-yellow-900/30 border-2 border-yellow-600' : 'bg-slate-700 border border-slate-600'
-                      }`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-lg text-white">
-                          {index === 0 && '👑 '}
-                          {player.username}
-                          {player.id === my_player_id && ' (You)'}
-                          {player.id === room.cambio_caller_id && ' (Called Cambio)'}
-                        </span>
-                        <span className="text-2xl font-bold text-white">{player.score} pts</span>
+                    <div key={player.id}>
+                      <div
+                        className={`p-4 rounded-lg ${
+                          index === 0 ? 'bg-yellow-900/30 border-2 border-yellow-600' : 'bg-slate-700 border border-slate-600'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center mb-4">
+                          <span className="font-bold text-lg text-white">
+                            {index === 0 && '👑 '}
+                            {player.username}
+                            {player.id === my_player_id && ' (You)'}
+                            {player.id === room.cambio_caller_id && ' (Called Cambio)'}
+                          </span>
+                          <span className="text-2xl font-bold text-white">{player.score} pts</span>
+                        </div>
+                        
+                        {/* Show player's cards */}
+                        <div className="flex justify-center gap-2 flex-wrap">
+                          {player.hand.map((card: any, cardIndex: number) => (
+                            card && (
+                              <div key={cardIndex} className="w-16 h-24">
+                                <div className="w-full h-full bg-white rounded-lg border-2 border-gray-300 shadow-lg p-1 flex flex-col">
+                                  <div className="text-sm font-bold" style={{ color: card.suit === 'hearts' || card.suit === 'diamonds' ? 'red' : 'black' }}>
+                                    <div>{card.rank}</div>
+                                    <div>{card.suit === 'hearts' ? '♥' : card.suit === 'diamonds' ? '♦' : card.suit === 'clubs' ? '♣' : '♠'}</div>
+                                  </div>
+                                  <div className="flex-1 flex items-center justify-center text-2xl" style={{ color: card.suit === 'hearts' || card.suit === 'diamonds' ? 'red' : 'black' }}>
+                                    {card.suit === 'hearts' ? '♥' : card.suit === 'diamonds' ? '♦' : card.suit === 'clubs' ? '♣' : '♠'}
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          ))}
+                        </div>
                       </div>
                     </div>
                   ))}
