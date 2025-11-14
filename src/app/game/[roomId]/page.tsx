@@ -652,13 +652,21 @@ export default function GamePage() {
       selectedCard
     })
     
+    // Race discard and card selection should work regardless of turn
     if (selectingCardToGive) {
       console.log('Action: Selecting card to give')
       handleSelectCardToGive(card.id)
-    } else if (isRaceMode && actualPlayerId === my_player_id) {
+      return
+    }
+    
+    if (isRaceMode && actualPlayerId === my_player_id) {
       console.log('Action: Race discard')
       handleRaceDiscard(card.id)
-    } else if (drawnCard && isMyTurn && !activePower) {
+      return
+    }
+    
+    // Regular turn actions
+    if (drawnCard && isMyTurn && !activePower) {
       console.log('Action: Swap with drawn card')
       handleSwapWithDrawnCard(card.id)
     } else if (activePower === 'peek_own') {
