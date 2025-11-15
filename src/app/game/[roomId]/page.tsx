@@ -1085,13 +1085,18 @@ export default function GamePage() {
               </div>
             )}
 
-            {/* Race-to-Discard Button */}
-            {room.discard_pile.length > 0 && !selectingCardToGive && (
+            {/* Race-to-Discard Button - Always available */}
+            {!selectingCardToGive && (
               <div className="fixed bottom-1/3 left-8 z-40">
                 {!isRaceMode ? (
                   <button
                     onClick={() => setIsRaceMode(true)}
-                    className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-bold text-lg shadow-2xl border-2 border-red-400"
+                    disabled={room.discard_pile.length === 0}
+                    className={`px-6 py-3 rounded-lg font-bold text-lg shadow-2xl border-2 ${
+                      room.discard_pile.length === 0
+                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed border-gray-500'
+                        : 'bg-red-600 hover:bg-red-700 text-white border-red-400'
+                    }`}
                   >
                     ⚡ RACE DISCARD
                   </button>
