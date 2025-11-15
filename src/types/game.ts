@@ -17,7 +17,7 @@ export interface GameRoom {
   started_at?: string
   finished_at?: string
   settings: GameSettings
-  creator_id?: string
+  creator_id?: string | null
   cambio_caller_id?: string
 }
 

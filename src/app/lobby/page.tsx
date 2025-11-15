@@ -2,152 +2,194 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
+import { createClient } from '@/lib/supabase/client'
 
-export default function Lobby() {
+export default function LobbyPage() {
   const router = useRouter()
   const [username, setUsername] = useState('')
   const [roomCode, setRoomCode] = useState('')
-  const [isCreating, setIsCreating] = useState(false)
-  const [isJoining, setIsJoining] = useState(false)
-  const [error, setError] = useState('')
+  const [showJoinInput, setShowJoinInput] = useState(false)
 
-  const createRoom = async () => {
-    if (!username) {
-      setError('Please enter a username')
+  const handleCreateRoom = async () => {
+    if (!username.trim()) {
+      alert('Please enter a username')
       return
     }
-    
-    setError('')
-    setIsCreating(true)
-    try {
-      const response = await fetch('/api/rooms/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username })
+
+    const supabase = createClient()
+
+    // Generate 6-character room code
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase()
+
+    const { data: room } = await supabase
+      .from('game_rooms')
+      .insert({
+        room_code: code,
+        status: 'waiting'
       })
-      
-      const data = await response.json()
-      if (data.room) {
-        localStorage.setItem('playerId', data.player.id)
-        router.push(`/waiting/${data.room.id}`)
-      } else {
-        setError(data.error || 'Failed to create room')
-      }
-    } catch (error) {
-      console.error('Failed to create room:', error)
-      setError('Failed to create room')
+      .select()
+      .single()
+
+    if (!room) {
+      alert('Failed to create room')
+      return
     }
-    setIsCreating(false)
+
+    const { data: player } = await supabase
+      .from('players')
+      .insert({
+        room_id: room.id,
+        username: username.trim(),
+        player_index: 0,
+        hand: [],
+        score: 0
+      })
+      .select()
+      .single()
+
+    if (!player) {
+      alert('Failed to join room')
+      return
+    }
+
+    await supabase
+      .from('game_rooms')
+      .update({ creator_id: player.id })
+      .eq('id', room.id)
+
+    localStorage.setItem('playerId', player.id)
+    router.push(`/waiting/${room.id}`)
   }
 
-  const joinRoom = async () => {
-    if (!username) {
-      setError('Please enter a username')
+  const handleJoinRoom = async () => {
+    if (!username.trim() || !roomCode.trim()) {
+      alert('Please enter username and room code')
       return
     }
-    if (!roomCode) {
-      setError('Please enter a room code')
+
+    const supabase = createClient()
+
+    const { data: room } = await supabase
+      .from('game_rooms')
+      .select('*')
+      .eq('room_code', roomCode.toUpperCase())
+      .single()
+
+    if (!room) {
+      alert('Room not found')
       return
     }
-    
-    setError('')
-    setIsJoining(true)
-    try {
-      const response = await fetch('/api/rooms/join', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, roomCode: roomCode.toUpperCase() })
+
+    if (room.status !== 'waiting') {
+      alert('Game already in progress')
+      return
+    }
+
+    const { data: existingPlayers } = await supabase
+      .from('players')
+      .select('*')
+      .eq('room_id', room.id)
+
+    const playerIndex = existingPlayers?.length || 0
+
+    const { data: player } = await supabase
+      .from('players')
+      .insert({
+        room_id: room.id,
+        username: username.trim(),
+        player_index: playerIndex,
+        hand: [],
+        score: 0
       })
-      
-      const data = await response.json()
-      if (data.room) {
-        localStorage.setItem('playerId', data.player.id)
-        router.push(`/waiting/${data.room.id}`)
-      } else {
-        setError(data.error || 'Failed to join room')
-      }
-    } catch (error) {
-      console.error('Failed to join room:', error)
-      setError('Failed to join room')
+      .select()
+      .single()
+
+    if (!player) {
+      alert('Failed to join room')
+      return
     }
-    setIsJoining(false)
+
+    localStorage.setItem('playerId', player.id)
+    router.push(`/waiting/${room.id}`)
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="bg-slate-800 rounded-3xl shadow-2xl p-10 max-w-md w-full border border-slate-700"
-      >
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-serif font-bold text-white mb-2">Cambio</h1>
-          <p className="text-slate-400">Join or create a game</p>
-        </div>
-        
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg mb-6">
-            {error}
-          </div>
-        )}
-        
+      <div className="bg-slate-800 rounded-2xl shadow-2xl p-8 w-full max-w-md border border-slate-700">
+        <h1 className="text-4xl font-serif font-bold text-white text-center mb-2">
+          Cambio
+        </h1>
+        <p className="text-slate-400 text-center mb-8">The memory based card game</p>
+
         <div className="space-y-4">
+          {/* Username Input */}
           <input
             type="text"
-            placeholder="Enter your username"
+            placeholder="Username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-400"
-            onKeyPress={(e) => e.key === 'Enter' && createRoom()}
+            className="w-full px-4 py-3 bg-slate-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          
-          <button
-            onClick={createRoom}
-            disabled={!username || isCreating}
-            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-lg hover:shadow-lg hover:shadow-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all"
-          >
-            {isCreating ? 'Creating...' : 'Create New Room'}
-          </button>
-          
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-700"></div>
+
+          {/* Create and Join buttons side by side */}
+          {!showJoinInput ? (
+            <div className="flex gap-3">
+              <button
+                onClick={handleCreateRoom}
+                disabled={!username.trim()}
+                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-colors"
+              >
+                Create Room
+              </button>
+              <button
+                onClick={() => setShowJoinInput(true)}
+                disabled={!username.trim()}
+                className="flex-1 py-3 bg-slate-600 hover:bg-slate-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-colors"
+              >
+                Join Room
+              </button>
             </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-slate-800 text-slate-500">OR</span>
+          ) : (
+            /* Join Room Input */
+            <div className="space-y-3">
+              <input
+                type="text"
+                placeholder="Enter room code"
+                value={roomCode}
+                onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                maxLength={6}
+                className="w-full px-4 py-3 bg-slate-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleJoinRoom}
+                  disabled={!roomCode.trim()}
+                  className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-colors"
+                >
+                  Join
+                </button>
+                <button
+                  onClick={() => {
+                    setShowJoinInput(false)
+                    setRoomCode('')
+                  }}
+                  className="px-6 py-3 bg-slate-600 hover:bg-slate-500 text-white font-bold rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-          </div>
-          
-          <input
-            type="text"
-            placeholder="Enter room code"
-            value={roomCode}
-            onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-            className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-400 font-mono"
-            maxLength={6}
-            onKeyPress={(e) => e.key === 'Enter' && joinRoom()}
-          />
-          
+          )}
+
+          {/* Back to Home */}
           <button
-            onClick={joinRoom}
-            disabled={!username || !roomCode || isJoining}
-            className="w-full bg-slate-700 text-white py-3 rounded-lg hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all border border-slate-600"
+            onClick={() => router.push('/')}
+            className="w-full py-2 text-slate-400 hover:text-white transition-colors text-sm"
           >
-            {isJoining ? 'Joining...' : 'Join Room'}
+            ← Back to Home
           </button>
         </div>
-
-        {/* Back button */}
-        <button
-          onClick={() => router.push('/')}
-          className="w-full mt-6 text-slate-400 hover:text-white text-sm transition-colors"
-        >
-          ← Back to Home
-        </button>
-      </motion.div>
+      </div>
     </div>
   )
 }

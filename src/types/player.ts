@@ -5,10 +5,9 @@ export interface Player {
   room_id: string
   username: string
   player_index: number
-  hand: CardInHand[]
+  hand: any[]
   score: number
-  is_ready: boolean
-  is_connected: boolean
-  last_action_at: string
-  has_peeked?: boolean
+  has_peeked: boolean
+  is_ready?: boolean  // ADD THIS LINE
+  created_at?: string
 }

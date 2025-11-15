@@ -827,10 +827,6 @@ export default function GamePage() {
                   🔔 CAMBIO CALLED!
                 </div>
               )}
-              <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-                <span className="text-sm text-slate-300">{isConnected ? 'Connected' : 'Disconnected'}</span>
-              </div>
             </div>
           </div>
         </div>
@@ -991,11 +987,32 @@ export default function GamePage() {
             </div>
 
             <div className="flex justify-center">
-              <PlayerHand
-                cards={myPlayer.hand}
-                isMyTurn={false}
-                onCardClick={() => {}}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                {myPlayer.hand.map((card: any, index: number) => {
+                  // Bottom 2 cards are face up (indices 2 and 3 in a 4-card hand)
+                  const isFaceUp = index >= myPlayer.hand.length - 2
+                  
+                  return (
+                    <div key={index} className="w-32 h-48">
+                      {isFaceUp ? (
+                        <div className="w-full h-full bg-white rounded-lg border-2 border-gray-300 shadow-lg p-2 flex flex-col">
+                          <div className="text-xl font-bold" style={{ color: card.suit === 'hearts' || card.suit === 'diamonds' ? 'red' : 'black' }}>
+                            <div>{card.rank}</div>
+                            <div>{card.suit === 'hearts' ? '♥' : card.suit === 'diamonds' ? '♦' : card.suit === 'clubs' ? '♣' : '♠'}</div>
+                          </div>
+                          <div className="flex-1 flex items-center justify-center text-4xl" style={{ color: card.suit === 'hearts' || card.suit === 'diamonds' ? 'red' : 'black' }}>
+                            {card.suit === 'hearts' ? '♥' : card.suit === 'diamonds' ? '♦' : card.suit === 'clubs' ? '♣' : '♠'}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-full h-full bg-red-600 rounded-lg border-4 border-white shadow-lg flex items-center justify-center">
+                          <span className="text-white font-bold text-2xl transform -rotate-45">CAMBIO</span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
         )}
