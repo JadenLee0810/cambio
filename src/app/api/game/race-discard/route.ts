@@ -18,6 +18,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No card to match' }, { status: 400 })
     }
 
+    // Check if race discard already happened this turn
+    if (room.race_discard_used_this_turn) {
+      return NextResponse.json({ 
+        error: 'Race discard already used this turn',
+        alreadyUsed: true 
+      }, { status: 400 })
+    }
+
     const topCard = room.discard_pile[room.discard_pile.length - 1]
 
     if (isOpponentCard) {
@@ -47,7 +55,7 @@ export async function POST(request: NextRequest) {
 
       // Check if rank matches
       if (cardToDiscard.rank !== topCard.rank) {
-        // PENALTY: Give penalty card to the player who made the mistake
+        // PENALTY: Wrong card goes to discard pile, give penalty card to player who made mistake
         if (room.deck.length === 0) {
           return NextResponse.json({ error: 'No cards left in deck for penalty' }, { status: 400 })
         }
@@ -55,6 +63,7 @@ export async function POST(request: NextRequest) {
         const penaltyCard = room.deck[0]
         const newDeck = room.deck.slice(1)
 
+        // Add penalty card to the player who made the mistake
         const newHand = [...myPlayer.hand, {
           ...penaltyCard,
           isFaceUp: false,
@@ -66,15 +75,32 @@ export async function POST(request: NextRequest) {
           .update({ hand: newHand })
           .eq('id', playerId)
 
+        // Put the wrong card on discard pile
+        const newDiscardPile = [...room.discard_pile, cardToDiscard]
+
+        // Remove card from opponent's hand (leave empty space)
+        const newOpponentHand = opponent.hand.map((c: any) => 
+          c && c.id === cardId ? null : c
+        )
+
+        await supabase
+          .from('players')
+          .update({ hand: newOpponentHand })
+          .eq('id', opponentId)
+
         await supabase
           .from('game_rooms')
-          .update({ deck: newDeck })
+          .update({ 
+            deck: newDeck,
+            discard_pile: newDiscardPile,
+            race_discard_used_this_turn: true
+          })
           .eq('id', roomId)
 
         return NextResponse.json({ 
           success: false, 
           penalty: true, 
-          error: 'Wrong card! Penalty card added to your hand.' 
+          error: 'Wrong card! It went to discard pile and you got a penalty card.' 
         })
       }
 
@@ -102,7 +128,10 @@ export async function POST(request: NextRequest) {
 
       await supabase
         .from('game_rooms')
-        .update({ discard_pile: newDiscardPile })
+        .update({ 
+          discard_pile: newDiscardPile,
+          race_discard_used_this_turn: true
+        })
         .eq('id', roomId)
 
       return NextResponse.json({ success: true })
@@ -127,7 +156,7 @@ export async function POST(request: NextRequest) {
 
       // Check if rank matches
       if (cardToDiscard.rank !== topCard.rank) {
-        // PENALTY: Replace the card with a new one from deck AND add penalty card
+        // PENALTY: Wrong card goes to discard, get replacement + penalty
         if (room.deck.length < 2) {
           return NextResponse.json({ error: 'Not enough cards in deck for penalty' }, { status: 400 })
         }
@@ -137,7 +166,7 @@ export async function POST(request: NextRequest) {
         const penaltyCard = room.deck[1]
         const newDeck = room.deck.slice(2)
 
-        // Replace the discarded card with replacement card and add penalty card
+        // Replace the wrong card and add penalty
         const newHand = player.hand.map((c: any) => {
           if (c && c.id === cardId) {
             return { ...replacementCard, position: c.position, isFaceUp: false }
@@ -145,12 +174,15 @@ export async function POST(request: NextRequest) {
           return c
         })
 
-        // Add penalty card as a new card at the end
+        // Add penalty card
         newHand.push({
           ...penaltyCard,
           isFaceUp: false,
           position: newHand.length
         })
+
+        // Put wrong card on discard pile
+        const newDiscardPile = [...room.discard_pile, cardToDiscard]
 
         await supabase
           .from('players')
@@ -159,18 +191,24 @@ export async function POST(request: NextRequest) {
 
         await supabase
           .from('game_rooms')
-          .update({ deck: newDeck })
+          .update({ 
+            deck: newDeck,
+            discard_pile: newDiscardPile,
+            race_discard_used_this_turn: true
+          })
           .eq('id', roomId)
 
         return NextResponse.json({ 
           success: false, 
           penalty: true, 
-          error: 'Wrong card! Your card was replaced and a penalty card was added.' 
+          error: 'Wrong card! It went to discard pile, your card was replaced, and you got a penalty card.' 
         })
       }
 
-      // Valid discard - remove card from hand
-      const newHand = player.hand.filter((c: any) => c && c.id !== cardId)
+      // Valid discard - remove card from hand (leave null/empty space)
+      const newHand = player.hand.map((c: any) => 
+        c && c.id === cardId ? null : c
+      )
 
       await supabase
         .from('players')
@@ -181,7 +219,10 @@ export async function POST(request: NextRequest) {
 
       await supabase
         .from('game_rooms')
-        .update({ discard_pile: newDiscardPile })
+        .update({ 
+          discard_pile: newDiscardPile,
+          race_discard_used_this_turn: true
+        })
         .eq('id', roomId)
 
       return NextResponse.json({ success: true })
