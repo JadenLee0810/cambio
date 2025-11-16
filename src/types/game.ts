@@ -19,6 +19,8 @@ export interface GameRoom {
   settings: GameSettings
   creator_id?: string | null
   cambio_caller_id?: string
+  highlighted_card_id?: string | null
+  highlighted_player_id?: string | null
 }
 
 export interface GameSettings {

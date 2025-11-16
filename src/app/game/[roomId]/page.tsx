@@ -397,18 +397,22 @@ export default function GamePage() {
 
     if (!player1 || !player2) return
 
-    const card1 = player1.hand.find((c: any) => c && c.id === card1Id)
-    const card2 = player2.hand.find((c: any) => c && c.id === card2Id)
+    const card1Index = player1.hand.findIndex((c: any) => c && c.id === card1Id)
+    const card2Index = player2.hand.findIndex((c: any) => c && c.id === card2Id)
+
+    if (card1Index === -1 || card2Index === -1) return
+
+    const card1 = player1.hand[card1Index]
+    const card2 = player2.hand[card2Index]
 
     if (!card1 || !card2) return
 
-    const newHand1 = player1.hand.map((c: any) =>
-      c && c.id === card1Id ? { ...card2, position: card1.position, isFaceUp: false } : c
-    )
+    // Create new hands with swapped cards at the correct indices
+    const newHand1 = [...player1.hand]
+    newHand1[card1Index] = { ...card2, position: card1.position, isFaceUp: false }
 
-    const newHand2 = player2.hand.map((c: any) =>
-      c && c.id === card2Id ? { ...card1, position: card2.position, isFaceUp: false } : c
-    )
+    const newHand2 = [...player2.hand]
+    newHand2[card2Index] = { ...card1, position: card2.position, isFaceUp: false }
 
     await supabase.from('players').update({ hand: newHand1 }).eq('id', player1Id)
     await supabase.from('players').update({ hand: newHand2 }).eq('id', player2Id)
@@ -418,6 +422,7 @@ export default function GamePage() {
     setSelectedOpponent(null)
     setSelectedPlayer1(null)
     setSelectedPlayer2(null)
+    setHighlightedCardId(null)
 
     // Auto end turn after blind swap
     await completeTurn()
@@ -1028,8 +1033,8 @@ export default function GamePage() {
                   <div
                     key={player.id}
                     className={`px-3 py-1 rounded ${player.has_peeked
-                        ? 'bg-green-600 text-white'
-                        : 'bg-slate-700 text-slate-300'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-slate-700 text-slate-300'
                       }`}
                   >
                     {player.username} {player.has_peeked ? '✓' : '...'}
@@ -1156,8 +1161,8 @@ export default function GamePage() {
                     onClick={() => setIsRaceMode(true)}
                     disabled={room.discard_pile.length === 0}
                     className={`px-6 py-3 rounded-lg font-bold text-lg shadow-2xl border-2 ${room.discard_pile.length === 0
-                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed border-gray-500'
-                        : 'bg-red-600 hover:bg-red-700 text-white border-red-400'
+                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed border-gray-500'
+                      : 'bg-red-600 hover:bg-red-700 text-white border-red-400'
                       }`}
                   >
                     ⚡ RACE DISCARD
@@ -1204,7 +1209,7 @@ export default function GamePage() {
               <DiscardPile
                 cards={room.discard_pile}
                 onDraw={handleDrawDiscard}
-                canDraw={!!(isMyTurn && !drawnCard && !activePower && !isFrozen && room.discard_pile.length > 0 && !selectingCardToGive && !hasDrawn)}
+                canDraw={false}
               />
             </div>
 
