@@ -18,7 +18,7 @@ export default function Home() {
         <div className="flex items-center justify-center gap-6">
           <div className="text-7xl">🃏</div>
           <h1 className="text-8xl font-serif font-bold text-white tracking-tight">
-            Cambio
+            Cambioz
           </h1>
         </div>
 
