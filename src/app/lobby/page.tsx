@@ -119,7 +119,7 @@ export default function LobbyPage() {
         <h1 className="text-4xl font-serif font-bold text-white text-center mb-2">
           Cambio
         </h1>
-        <p className="text-slate-400 text-center mb-8">Version 1.3</p>
+        <p className="text-slate-400 text-center mb-8">Version 1.4</p>
 
         <div className="space-y-4">
           {/* Username Input */}

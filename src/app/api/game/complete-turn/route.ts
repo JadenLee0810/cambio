@@ -32,8 +32,8 @@ export async function POST(request: NextRequest) {
     await supabase
       .from('game_rooms')
       .update({ 
-        current_turn: nextTurn,
-        race_discard_used_this_turn: false  // Reset race discard flag
+        current_turn: nextTurn
+        // DO NOT reset race_discard flag - race discard is independent!
       })
       .eq('id', roomId)
 
