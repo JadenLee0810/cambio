@@ -2,22 +2,25 @@
 
 interface DeckProps {
   cardCount: number
-  onDraw?: () => void
-  canDraw?: boolean
+  onDraw: () => void
+  canDraw: boolean
 }
 
-export const Deck = ({ cardCount, onDraw, canDraw }: DeckProps) => {
+export function Deck({ cardCount, onDraw, canDraw }: DeckProps) {
   return (
-    <div className="relative">
-      <div
+    <div className="flex flex-col items-center">
+      <div 
         onClick={canDraw ? onDraw : undefined}
-        className={`w-24 h-36 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg border-2 border-blue-900 shadow-xl flex flex-col items-center justify-center ${
-          canDraw ? 'cursor-pointer hover:scale-105 transition-transform' : 'opacity-50'
-        }`}
+        className={`w-32 h-48 ${canDraw ? 'cursor-pointer hover:scale-105' : 'cursor-not-allowed'} transition-transform`}
       >
-        <div className="text-white text-4xl font-bold opacity-30">C</div>
-        <div className="text-white text-sm mt-2">{cardCount} cards</div>
+        <div className="w-full h-full bg-blue-600 rounded-lg border-4 border-white shadow-lg flex flex-col items-center justify-center">
+          <span className="text-white font-bold text-6xl">C</span>
+          <span className="text-white text-sm mt-2">{cardCount} cards</span>
+        </div>
       </div>
+      {canDraw && (
+        <p className="text-green-400 text-sm mt-2">Click to draw</p>
+      )}
     </div>
   )
 }
