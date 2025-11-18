@@ -187,7 +187,7 @@ export default function LobbyPage() {
             onClick={() => router.push('/')}
             className="w-full py-2 text-slate-400 hover:text-white transition-colors text-sm"
           >
-            ← Back to Home
+            ← Home
           </button>
         </div>
       </div>

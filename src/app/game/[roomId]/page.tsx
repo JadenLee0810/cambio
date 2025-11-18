@@ -935,10 +935,10 @@ export default function GamePage() {
           <div className="text-center space-y-8">
             <div className="bg-slate-800 rounded-lg shadow-lg p-6 border border-slate-700">
               <h2 className="text-2xl font-bold text-white mb-4">
-                📖 Memorize Your Bottom Cards
+                📖 Memorize Your Cards
               </h2>
               <p className="text-slate-300 mb-6">
-                Look at your bottom 2 cards and remember them. Click "Ready" when you've memorized them.
+                Click "Ready" when you have memorized your cards.
               </p>
               
               <div className="flex justify-center gap-3 mb-6">
@@ -951,7 +951,7 @@ export default function GamePage() {
                         : 'bg-slate-700 text-slate-300'
                     }`}
                   >
-                    {player.username} {player.has_peeked ? '✓' : '...'}
+                    {player.username} {player.has_peeked ? '✓' : ''}
                   </div>
                 ))}
               </div>
