@@ -10,7 +10,7 @@ export default function WaitingRoomPage() {
   const router = useRouter()
   const roomId = params.roomId as string
   const [loading, setLoading] = useState(true)
-  
+
   const {
     room,
     players,
@@ -24,20 +24,20 @@ export default function WaitingRoomPage() {
     const loadRoomData = async () => {
       const supabase = createClient()
       const playerId = localStorage.getItem('playerId')
-      
+
       const { data: roomData } = await supabase
         .from('game_rooms')
         .select('*')
         .eq('id', roomId)
         .single()
-      
+
       const { data: playersData } = await supabase
         .from('players')
         .select('*')
         .eq('room_id', roomId)
-      
+
       const validPlayer = playersData?.find(p => p.id === playerId)
-      
+
       if (roomData && playersData) {
         useGameStore.getState().setGameState({
           room: roomData,
@@ -45,20 +45,20 @@ export default function WaitingRoomPage() {
           my_player_id: validPlayer ? playerId || undefined : undefined
         })
       }
-      
+
       setLoading(false)
     }
-    
+
     loadRoomData()
     subscribeToRoom(roomId)
-    
+
     return () => unsubscribe()
   }, [roomId])
 
   useEffect(() => {
     console.log('Room status changed:', room?.status)
     console.log('Game phase:', room?.game_phase)
-    
+
     if (room?.status === 'playing') {
       console.log('Redirecting to game page...')
       router.push(`/game/${roomId}`)
@@ -68,7 +68,7 @@ export default function WaitingRoomPage() {
   const handleReady = async () => {
     const myPlayer = players.find(p => p.id === my_player_id)
     const newReadyState = !myPlayer?.is_ready
-    
+
     // Save ready state to database
     const supabase = createClient()
     await supabase
@@ -82,7 +82,7 @@ export default function WaitingRoomPage() {
     console.log('allReady:', allReady)
     console.log('isHost:', isHost)
     console.log('roomId:', roomId)
-    
+
     if (!allReady) {
       console.log('Not all ready - blocking')
       alert('All players must be ready!')
@@ -90,26 +90,26 @@ export default function WaitingRoomPage() {
     }
 
     console.log('Starting game for room:', roomId)
-    
+
     try {
       const response = await fetch('/api/game/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomId })
       })
-      
+
       console.log('Response status:', response.status)
       console.log('Response ok:', response.ok)
-      
+
       const data = await response.json()
       console.log('Response data:', data)
-      
+
       if (!response.ok) {
         console.error('API Error:', data)
         alert('Failed to start game: ' + (data.error || 'Unknown error'))
         return
       }
-      
+
       console.log('Game started successfully!')
       console.log('Current room status:', room?.status)
       console.log('Current game phase:', room?.game_phase)
@@ -121,14 +121,14 @@ export default function WaitingRoomPage() {
 
   const handleLeaveRoom = async () => {
     const supabase = createClient()
-    
+
     if (my_player_id) {
       await supabase
         .from('players')
         .delete()
         .eq('id', my_player_id)
     }
-    
+
     localStorage.removeItem('playerId')
     router.push('/lobby')
   }
@@ -179,16 +179,15 @@ export default function WaitingRoomPage() {
             </h2>
             <button
               onClick={handleReady}
-              className={`px-6 py-2 rounded font-bold transition-colors ${
-                myPlayer?.is_ready
-                  ? 'bg-green-600 hover:bg-green-700 text-white'
-                  : 'bg-red-600 hover:bg-red-700 text-white'
-              }`}
+              className={`px-6 py-2 rounded font-bold transition-colors ${myPlayer?.is_ready
+                ? 'bg-green-600 hover:bg-green-700 text-white'
+                : 'bg-red-600 hover:bg-red-700 text-white'
+                }`}
             >
               {myPlayer?.is_ready ? '✓ Ready' : 'Not Ready'}
             </button>
           </div>
-          
+
           <div className="space-y-4 mb-8">
             {players.map((player) => (
               <div
@@ -196,18 +195,18 @@ export default function WaitingRoomPage() {
                 className="bg-slate-700 rounded-lg p-4 flex justify-between items-center"
               >
                 <div className="flex items-center gap-3">
-                  <span className={`font-bold text-lg ${
-                    player.id === my_player_id ? 'text-yellow-400' : 'text-white'
-                  }`}>
+                  <span className={`font-bold text-lg ${player.id === my_player_id ? 'text-yellow-400' : 'text-white'
+                    }`}>
                     {player.username}
                   </span>
                   {room.creator_id && player.id === room.creator_id && (
-                    <span className="bg-yellow-600 text-white text-sm px-2 py-1 rounded">
-                      Host
+                    <span className="text-white text-lg font-bold">
+                      (Host)
                     </span>
+
                   )}
                 </div>
-                
+
                 {player.is_ready ? (
                   <span className="text-green-400 font-bold">✓ Ready</span>
                 ) : (
@@ -221,11 +220,10 @@ export default function WaitingRoomPage() {
             <button
               onClick={handleStartGame}
               disabled={!allReady}
-              className={`w-full py-4 rounded-lg font-bold text-xl transition-colors ${
-                allReady
-                  ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
-                  : 'bg-slate-600 text-slate-400 cursor-not-allowed'
-              }`}
+              className={`w-full py-4 rounded-lg font-bold text-xl transition-colors ${allReady
+                ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
+                : 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                }`}
             >
               {allReady ? 'Start Game' : 'Waiting for all players to be ready...'}
             </button>

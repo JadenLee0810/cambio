@@ -38,6 +38,7 @@ export default function GamePage() {
   const [hasDrawn, setHasDrawn] = useState(false)
   const [cambioCaller, setCambioCaller] = useState<string | null>(null)
   const [showCambioPopup, setShowCambioPopup] = useState(false)
+  const [showTip, setShowTip] = useState(true)
   
   const {
     room,
@@ -776,10 +777,27 @@ export default function GamePage() {
         </div>
 
         {/* Shift+Click Instructions */}
-        {isActualGame && room.discard_pile.length > 0 && (
-          <div className="fixed top-20 right-8 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg border-2 border-red-400 text-sm z-30">
-            <p className="font-bold">💡 Tip: Shift+Click any card to race discard!</p>
-            <p className="text-xs mt-1">Match the rank: {room.discard_pile[room.discard_pile.length - 1]?.rank}</p>
+        {isActualGame && room.discard_pile.length > 0 && showTip && (
+          <div 
+            className="fixed top-20 right-8 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg border-2 border-red-400 text-sm z-30 cursor-pointer hover:bg-red-700 transition-colors"
+            onClick={() => setShowTip(false)}
+            title="Click to dismiss"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="font-bold">💡 Tip: Shift+Click any card to race discard!</p>
+                <p className="text-xs mt-1">Match the rank: {room.discard_pile[room.discard_pile.length - 1]?.rank}</p>
+              </div>
+              <button 
+                className="text-white hover:text-gray-200 font-bold text-xl leading-none"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowTip(false)
+                }}
+              >
+                ×
+              </button>
+            </div>
           </div>
         )}
 

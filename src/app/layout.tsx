@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cambio Card Game",  // ← Change this
-  description: "Play Cambio online with friends",  // ← Change this
+  title: "Cambio Card",  // ← Change this
+  description: "Play Cambio online",  // ← Change this
   icons: {
     icon: '/favicon.ico',  // ← Point to your favicon
   }
