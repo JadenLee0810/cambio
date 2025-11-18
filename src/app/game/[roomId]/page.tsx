@@ -1204,7 +1204,7 @@ export default function GamePage() {
               <Deck
                 cardCount={room.deck.length}
                 onDraw={handleDrawDeck}
-                canDraw={isMyTurn && !drawnCard && !activePower && !isFrozen && !selectingCardToGive && !hasDrawn}
+                canDraw={!!(isMyTurn && !drawnCard && !activePower && !isFrozen && !selectingCardToGive && !hasDrawn)}
               />
               <DiscardPile
                 cards={room.discard_pile}
