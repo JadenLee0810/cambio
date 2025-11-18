@@ -109,6 +109,25 @@ export default function GamePage() {
     }
   }, [room?.cambio_caller_id, players, cambioCaller])
 
+  // Check if game should end when it's Cambio caller's turn again
+  useEffect(() => {
+    const checkGameEnd = async () => {
+      if (room?.cambio_caller_id && room.game_phase === 'playing' && room.status === 'playing') {
+        const cambioCallerPlayer = players.find(p => p.id === room.cambio_caller_id)
+        if (cambioCallerPlayer && room.current_turn === cambioCallerPlayer.player_index) {
+          console.log('🔚 Game ending - Cambio caller turn again')
+          await fetch('/api/game/end-game', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ roomId })
+          })
+        }
+      }
+    }
+    
+    checkGameEnd()
+  }, [room?.current_turn, room?.cambio_caller_id, room?.game_phase, room?.status, players, roomId])
+
   const setHighlightedCardForAll = async (cardId: string | null, playerId: string | null = null) => {
     const supabase = createClient()
     await supabase
@@ -320,20 +339,6 @@ export default function GamePage() {
   const completeTurn = async () => {
     if (myPlayer) {
       setMyLastTurnIndex(myPlayer.player_index)
-    }
-    
-    // Check if game should end (Cambio caller's turn again)
-    if (room?.cambio_caller_id) {
-      const cambioCallerPlayer = players.find(p => p.id === room.cambio_caller_id)
-      if (cambioCallerPlayer && room.current_turn === cambioCallerPlayer.player_index) {
-        // End the game
-        await fetch('/api/game/end-game', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ roomId })
-        })
-        return
-      }
     }
     
     await fetch('/api/game/complete-turn', {
