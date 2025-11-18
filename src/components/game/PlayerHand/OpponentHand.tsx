@@ -4,7 +4,7 @@ import { Player } from '@/types/player'
 
 interface OpponentHandProps {
   player: Player
-  onCardClick: (card: any) => void
+  onCardClick: (card: any, e?: React.MouseEvent) => void
   clickable?: boolean
   highlightedCardId?: string | null
   recentlyChangedCardId?: string | null
@@ -23,7 +23,6 @@ export function OpponentHand({
       <div className="grid grid-cols-2 gap-3">
         {player.hand.map((card: any, index: number) => {
           if (!card) {
-            // Empty space for discarded card
             return (
               <div 
                 key={index} 
@@ -38,14 +37,13 @@ export function OpponentHand({
           return (
             <div
               key={card.id}
-              onClick={() => clickable && onCardClick(card)}
-              className={`w-24 h-36 transition-all duration-300 ${
-                clickable ? 'cursor-pointer hover:scale-105' : ''
-              } ${
+              onClick={(e) => onCardClick(card, e)}
+              className={`w-24 h-36 transition-all duration-300 cursor-pointer hover:scale-105 ${
                 isHighlighted ? 'ring-4 ring-yellow-400 ring-offset-2 ring-offset-slate-900' : ''
               } ${
                 isRecentlyChanged ? 'ring-4 ring-green-400 ring-offset-2 ring-offset-slate-900 animate-pulse' : ''
               }`}
+              title={clickable ? "Click to use power | Shift+Click to race discard" : "Shift+Click to race discard"}
             >
               {card.isFaceUp ? (
                 <div className="w-full h-full bg-white rounded-lg border-2 border-gray-300 shadow-lg p-1 flex flex-col">
@@ -68,4 +66,4 @@ export function OpponentHand({
       </div>
     </div>
   )
-}
+} 

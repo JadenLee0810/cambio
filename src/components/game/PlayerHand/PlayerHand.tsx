@@ -5,7 +5,7 @@ import { Card } from '@/types/card'
 interface PlayerHandProps {
   cards: Card[]
   isMyTurn: boolean
-  onCardClick: (card: Card) => void
+  onCardClick: (card: Card, e?: React.MouseEvent) => void
   highlightedCardId?: string | null
   recentlyChangedCardId?: string | null
 }
@@ -23,7 +23,6 @@ export function PlayerHand({
       <div className="grid grid-cols-2 gap-4">
         {cards.map((card: any, index: number) => {
           if (!card) {
-            // Empty space for discarded card
             return (
               <div 
                 key={index} 
@@ -38,14 +37,13 @@ export function PlayerHand({
           return (
             <div 
               key={card.id} 
-              onClick={() => isMyTurn && onCardClick(card)}
-              className={`w-32 h-48 transition-all duration-300 ${
-                isMyTurn ? 'cursor-pointer hover:scale-105' : ''
-              } ${
+              onClick={(e) => onCardClick(card, e)}
+              className={`w-32 h-48 transition-all duration-300 cursor-pointer hover:scale-105 ${
                 isHighlighted ? 'ring-4 ring-yellow-400 ring-offset-2 ring-offset-slate-900' : ''
               } ${
                 isRecentlyChanged ? 'ring-4 ring-green-400 ring-offset-2 ring-offset-slate-900 animate-pulse' : ''
               }`}
+              title="Click to use | Shift+Click to race discard"
             >
               {card.isFaceUp ? (
                 <div className="w-full h-full bg-white rounded-lg border-2 border-gray-300 shadow-lg p-2 flex flex-col">
