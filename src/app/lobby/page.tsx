@@ -193,7 +193,7 @@ export default function LobbyPage() {
       </div>
     </div>
   )
-}'use client'
+}
 
 import { Card } from '@/types/card'
 
