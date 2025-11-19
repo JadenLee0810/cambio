@@ -8,6 +8,7 @@ import { PlayerHand } from '@/components/game/PlayerHand/PlayerHand'
 import { OpponentHand } from '@/components/game/PlayerHand/OpponentHand'
 import { Deck } from '@/components/game/Deck/Deck'
 import { DiscardPile } from '@/components/game/Deck/DiscardPile'
+import { Chat } from '@/components/game/Chat/Chat'
 import { Card as CardType } from '@/types/card'
 import { Player } from '@/types/player'
 
@@ -935,10 +936,10 @@ export default function GamePage() {
           <div className="text-center space-y-8">
             <div className="bg-slate-800 rounded-lg shadow-lg p-6 border border-slate-700">
               <h2 className="text-2xl font-bold text-white mb-4">
-                📖 Memorize Your Cards
+                📖 Memorize Your Bottom Cards
               </h2>
               <p className="text-slate-300 mb-6">
-                Click "Ready" when you have memorized your cards.
+                Look at your bottom 2 cards and remember them. Click "Ready" when you've memorized them.
               </p>
               
               <div className="flex justify-center gap-3 mb-6">
@@ -951,7 +952,7 @@ export default function GamePage() {
                         : 'bg-slate-700 text-slate-300'
                     }`}
                   >
-                    {player.username} {player.has_peeked ? '✓' : ''}
+                    {player.username} {player.has_peeked ? '✓' : '...'}
                   </div>
                 ))}
               </div>
@@ -1175,6 +1176,15 @@ export default function GamePage() {
               </button>
             </div>
           </div>
+        )}
+
+        {/* Chat Component */}
+        {isPlaying && myPlayer && (
+          <Chat 
+            roomId={roomId}
+            playerId={my_player_id!}
+            playerName={myPlayer.username}
+          />
         )}
       </div>
     </div>
