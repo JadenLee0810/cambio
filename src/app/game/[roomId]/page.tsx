@@ -114,15 +114,37 @@ export default function GamePage() {
   // Check if game should end when it's Cambio caller's turn again
   useEffect(() => {
     const checkGameEnd = async () => {
+      if (!room || !players.length) return
+      
+      console.log('🔍 Checking game end:', {
+        cambio_caller_id: room.cambio_caller_id,
+        game_phase: room.game_phase,
+        status: room.status,
+        current_turn: room.current_turn
+      })
+      
       if (room?.cambio_caller_id && room.game_phase === 'playing' && room.status === 'playing') {
         const cambioCallerPlayer = players.find(p => p.id === room.cambio_caller_id)
+        
+        console.log('📊 Cambio caller check:', {
+          cambioCallerId: room.cambio_caller_id,
+          cambioCallerPlayer: cambioCallerPlayer?.username,
+          cambioCallerIndex: cambioCallerPlayer?.player_index,
+          currentTurn: room.current_turn,
+          match: cambioCallerPlayer && room.current_turn === cambioCallerPlayer.player_index
+        })
+        
         if (cambioCallerPlayer && room.current_turn === cambioCallerPlayer.player_index) {
-          console.log('🔚 Game ending - Cambio caller turn again')
-          await fetch('/api/game/end-game', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ roomId })
-          })
+          console.log('🔚 ENDING GAME - Cambio caller turn again!')
+          
+          // Only call if we haven't already (prevent duplicate calls)
+          if (room.status === 'playing') {
+            await fetch('/api/game/end-game', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ roomId })
+            })
+          }
         }
       }
     }
@@ -485,22 +507,50 @@ export default function GamePage() {
   }
 
   const handleConfirmSwap = async () => {
-    if (!selectedCard1Id || !selectedCard2Id) return
-    if (!selectedPlayer1 || !selectedPlayer2) return
-    if (revealedCards.length !== 2) return
+    console.log('=== CONFIRM SWAP START ===')
+    console.log('Selected cards:', { selectedCard1Id, selectedCard2Id })
+    console.log('Selected players:', { selectedPlayer1, selectedPlayer2 })
+    
+    if (!selectedCard1Id || !selectedCard2Id) {
+      console.error('ERROR: Card IDs missing')
+      return
+    }
+    if (!selectedPlayer1 || !selectedPlayer2) {
+      console.error('ERROR: Player IDs missing')
+      return
+    }
+    if (revealedCards.length !== 2) {
+      console.error('ERROR: Wrong number of revealed cards:', revealedCards.length)
+      return
+    }
     
     const supabase = createClient()
     
     const { data: player1 } = await supabase.from('players').select('*').eq('id', selectedPlayer1).single()
     const { data: player2 } = await supabase.from('players').select('*').eq('id', selectedPlayer2).single()
     
-    if (!player1 || !player2) return
+    if (!player1 || !player2) {
+      console.error('ERROR: Players not found')
+      return
+    }
+    
+    console.log('Player 1 hand before swap:', player1.hand.length, 'cards')
+    console.log('Player 2 hand before swap:', player2.hand.length, 'cards')
     
     const card1 = player1.hand.find((c: any) => c && c.id === selectedCard1Id)
     const card2 = player2.hand.find((c: any) => c && c.id === selectedCard2Id)
     
-    if (!card1 || !card2) return
+    if (!card1 || !card2) {
+      console.error('ERROR: Cards not found in hands')
+      return
+    }
     
+    console.log('Swapping:', { 
+      card1: `${card1.rank} at position ${card1.position}`,
+      card2: `${card2.rank} at position ${card2.position}`
+    })
+    
+    // CRITICAL: Use map to replace, not add
     const newHand1 = player1.hand.map((c: any) => {
       if (c && c.id === selectedCard1Id) {
         return { ...card2, position: card1.position, isFaceUp: false }
@@ -515,8 +565,13 @@ export default function GamePage() {
       return c
     })
     
+    console.log('Player 1 hand after swap:', newHand1.length, 'cards')
+    console.log('Player 2 hand after swap:', newHand2.length, 'cards')
+    
     await supabase.from('players').update({ hand: newHand1 }).eq('id', selectedPlayer1)
     await supabase.from('players').update({ hand: newHand2 }).eq('id', selectedPlayer2)
+    
+    console.log('=== CONFIRM SWAP COMPLETE ===')
     
     setShowSwapChoice(false)
     setRevealedCards([])
