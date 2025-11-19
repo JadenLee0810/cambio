@@ -768,6 +768,15 @@ export default function GamePage() {
                 </button>
               )}
               
+              {canCallCambio && (
+                <button
+                  onClick={handleCallCambio}
+                  className="bg-yellow-600 text-black px-6 py-2 rounded hover:bg-yellow-700 font-bold text-lg border-2 border-yellow-400"
+                >
+                  🔔 Call Cambio!
+                </button>
+              )}
+              
               {isCambioPhase && (
                 <div className="bg-yellow-600 text-white px-3 py-1 rounded font-bold">
                   🔔 CAMBIO CALLED!
@@ -1095,19 +1104,6 @@ export default function GamePage() {
                 canDraw={false}
               />
             </div>
-
-            {/* Call Cambio Button - Only visible during next player's turn */}
-            {canCallCambio && (
-              <div className="fixed top-24 right-8 bg-yellow-600 rounded-lg shadow-lg p-4 space-y-3 min-w-[200px] border-2 border-yellow-400">
-                <h3 className="font-bold text-lg text-black text-center">Call Cambio?</h3>
-                <button
-                  onClick={handleCallCambio}
-                  className="w-full bg-black text-yellow-400 py-3 rounded hover:bg-gray-900 font-bold text-lg"
-                >
-                  🔔 Call Cambio!
-                </button>
-              </div>
-            )}
 
             <div className="fixed bottom-8 right-8">
               <PlayerHand
